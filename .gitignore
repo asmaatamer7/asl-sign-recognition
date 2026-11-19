@@ -1,0 +1,6 @@
+keypoints/
+videos_subset/
+*.zip
+__pycache__/
+.venv/
+checkpoints/*.pt

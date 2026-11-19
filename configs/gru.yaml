@@ -1,0 +1,1 @@
+model: {name: gru, hidden: 128, layers: 2, dropout: 0.3, cell: gru, bidirectional: true}

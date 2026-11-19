@@ -1,0 +1,12 @@
+torch>=2.1
+numpy
+pandas
+scipy
+scikit-learn
+pyyaml
+matplotlib
+joblib
+tabulate
+opencv-python        # keypoint extraction + demo
+mediapipe==0.10.14   # keypoint extraction + demo
+gradio>=4.0          # demo only

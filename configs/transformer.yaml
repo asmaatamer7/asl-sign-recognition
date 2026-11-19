@@ -1,0 +1,1 @@
+model: {name: transformer, d_model: 128, heads: 4, layers: 3, mlp_ratio: 2, dropout: 0.2, attn: true}

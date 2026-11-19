@@ -1,0 +1,17 @@
+data:
+  csv: subset_kp.csv
+  joints: all          # all | hands | body   (ablation)
+  use_z: false         # representation study
+  use_vel: false       # representation study
+  aug: {rotate: 15, scale: 0.15, shift: 0.1, noise: 0.01, tcrop: 0.7}
+train:
+  epochs: 60
+  batch_size: 64
+  lr: 0.001
+  weight_decay: 0.01
+  label_smoothing: 0.1
+  warmup_epochs: 3
+  patience: 12
+  init_from: null      # path of an SSL-pretrained encoder (pretrained-vs-scratch)
+model:
+  name: transformer

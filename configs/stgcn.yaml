@@ -1,0 +1,1 @@
+model: {name: stgcn, width: 64, blocks: 4, dropout: 0.2}

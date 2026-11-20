@@ -16,7 +16,6 @@ SPACES = {
     "baseline": {
         "model.C": [0.001, 0.01, 0.1, 1.0, 10.0, 100.0]
     },
-
     "gru": {
         "train.lr": [3e-4, 1e-3, 3e-3],
         "model.hidden": [64, 128, 256],
@@ -24,7 +23,6 @@ SPACES = {
         "model.dropout": [0.2, 0.3, 0.5],
         "train.weight_decay": [0.0, 0.01, 0.05]
     },
-
     "transformer": {
         "train.lr": [3e-4, 1e-3, 3e-3],
         "model.d_model": [64, 128, 192],
@@ -32,7 +30,6 @@ SPACES = {
         "model.dropout": [0.1, 0.2, 0.3],
         "train.weight_decay": [0.0, 0.01, 0.05]
     },
-
     "stgcn": {
         "train.lr": [3e-4, 1e-3, 3e-3],
         "model.width": [32, 64, 96],
@@ -49,7 +46,6 @@ if __name__ == "__main__":
     parser.add_argument("--model", required=True, choices=SPACES)
     parser.add_argument("--trials", type=int, default=6)
     parser.add_argument("--epochs", type=int, default=None)
-
     args = parser.parse_args()
 
     rng = np.random.default_rng(1234)

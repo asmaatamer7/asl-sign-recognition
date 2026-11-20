@@ -1,0 +1,27 @@
+data:
+  aug:
+    noise: 0.01
+    rotate: 15
+    scale: 0.15
+    shift: 0.1
+    tcrop: 0.7
+  csv: subset_kp.csv
+  joints: all
+  use_vel: false
+  use_z: false
+model:
+  bidirectional: true
+  cell: gru
+  dropout: 0.3
+  hidden: 256
+  layers: 2
+  name: gru
+train:
+  batch_size: 64
+  epochs: 60
+  init_from: null
+  label_smoothing: 0.1
+  lr: 0.003
+  patience: 12
+  warmup_epochs: 3
+  weight_decay: 0.0

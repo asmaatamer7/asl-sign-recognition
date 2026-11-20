@@ -102,4 +102,17 @@ Training time and inference performance vary depending on the model and hardware
 - MediaPipe for pose and hand landmark extraction.
 - TensorFlow and related machine learning libraries.
 - Gradio for the interactive demo.
+## Ablation Study
 
+Ablation experiments were defined to investigate the contribution of
+attention mechanisms, joint selection, and input representation.
+
+The planned experiments include:
+- Transformer without attention.
+- Transformer using hand joints only.
+- Transformer using body joints only.
+- ST-GCN using hand joints only.
+- ST-GCN using body joints only.
+
+These experiments were not completed within the project timeline.
+Therefore, no ablation results are reported.

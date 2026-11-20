@@ -1,56 +1,208 @@
-# Isolated Sign-Language Recognition on ASL Citizen (pose-based)
 
-**Course:** Deep Learning AI403, Pharos University in Alexandria, Fall 2026
-**Team:** <TEAM NAME> — <member 1 (ID)>, <member 2 (ID)>, <member 3 (ID)>, <member 4 (ID)>
-**Idea chosen:** #15 Isolated sign-language recognition (video / pose sequence → word)
+# 🤟 Isolated Sign Language Recognition
+### Pose-Based Deep Learning on ASL Citizen
 
-## 1. Task and best result
-Classify a short video of one ASL sign into one of **100 signs** (random subset of ASL Citizen, official
-signer-independent split). Videos → MediaPipe Holistic keypoints (7 body + 2×21 hand joints) → sequence models. **Framework: TensorFlow / Keras.**
-Best result: **<MODEL> — top-1 XX.X ± X.X %, top-5 XX.X %, macro-F1 XX.X %** (mean ± SD, 3 seeds, test set). *(fill in)*
+**Deep Learning — AI403 | Pharos University in Alexandria**  
+**Academic Year: 2026–2027 | Fall 2026**
 
-## 2. Environment
+---
+
+## 👥 Team Members
+
+| # | Student Name | Student ID |
+|---|---|---|
+| 1 | Asmaa Tamer Farahat Saad | 202302724 |
+| 2 | Hana Emad El Din Shazly | 202302840 |
+| 3 | Maram Mohamed Ashour | 202302848 |
+| 4 | Noureen Mohamed Ashour | 202302849 |
+
+---
+
+## 🎯 Project Overview
+
+This project focuses on **Isolated American Sign Language (ASL) Recognition**.
+
+The goal is to classify short sign-language video sequences into their corresponding signs using deep learning models.
+
+Instead of processing raw video frames directly, the project uses pose-based representations extracted with **MediaPipe Holistic**. These representations are then processed by sequence-learning models implemented using **TensorFlow / Keras**.
+
+### Project Information
+
+| Item | Description |
+|---|---|
+| Course | Deep Learning (AI403) |
+| University | Pharos University in Alexandria |
+| Selected Idea | #15 — Isolated Sign Language Recognition |
+| Dataset | ASL Citizen |
+| Task | Multi-class classification |
+| Number of Classes | 100 signs |
+| Input Representation | Pose sequences |
+| Feature Extraction | MediaPipe Holistic |
+| Deep Learning Framework | TensorFlow / Keras |
+
+---
+
+## 🏆 Model Performance
+
+Final model comparison and performance results will be added after completing all experiments and evaluating the models using three random seeds.
+
+| Metric | Result |
+|---|---|
+| Best Model | Pending |
+| Test Top-1 Accuracy | Pending |
+| Test Top-5 Accuracy | Pending |
+| Test Macro F1-score | Pending |
+| Number of Seeds | 3 |
+
+---
+
+## 📂 Repository Structure
+
+```text
+asl-sign-recognition/
+│
+├── configs/
+│   └── baseline.yaml
+│
+├── data/
+│   └── DATASET.md
+│
+├── demo/
+│
+├── results/
+│   └── main/
+│       └── baseline/
+│           └── seed0/
+│               └── metrics.json
+│
+├── src/
+│
+├── requirements.txt
+├── README.md
+└── .gitignore
+```
+
+*Additional model results and files will be added as experiments are completed.*
+
+---
+
+## 📊 Dataset
+
+The project uses a 100-class subset of the **ASL Citizen** dataset.
+
+The dataset contains isolated sign-language videos performed by different signers.
+
+### Dataset Preparation
+
+1. Select a subset of 100 signs.
+2. Use the official signer-independent train, validation, and test splits.
+3. Extract pose and hand keypoints using MediaPipe Holistic.
+4. Normalize the extracted keypoints.
+5. Prepare fixed-length sequences for model training.
+
+### Dataset Split
+
+| Split | Number of Samples |
+|---|---:|
+| Training | 1,490 |
+| Validation | 384 |
+| Testing | 1,215 |
+| **Total** | **3,089** |
+
+**Note:** Raw videos and extracted keypoint files are not stored in this GitHub repository.
+
+For dataset setup and access instructions, see [`data/DATASET.md`](data/DATASET.md).
+
+---
+
+## ⚙️ Installation
+
+### 1. Clone the repository
+
 ```bash
-python -m venv .venv && source .venv/bin/activate
+git clone https://github.com/asmaatamer7/asl-sign-recognition.git
+cd asl-sign-recognition
+```
+
+### 2. Create a virtual environment
+
+**Windows:**
+
+```bash
+python -m venv venv
+venv\Scripts\activate
+```
+
+**Linux / macOS:**
+
+```bash
+python -m venv venv
+source venv/bin/activate
+```
+
+### 3. Install dependencies
+
+```bash
 pip install -r requirements.txt
 ```
-## 3. Data (no raw data is stored in the repo)
-Download `ASL_Citizen.zip` (42.8 GB, v1.0) from https://www.microsoft.com/en-us/download/details.aspx?id=105253
-```bash
-python data/make_subset.py --zip ASL_Citizen.zip --n-signs 100          # -> subset.csv + videos_subset/
-python data/extract_keypoints.py --workers 4                            # -> keypoints/*.npy + subset_kp.csv
-```
-Shared drive with the extracted `keypoints/` and `subset_kp.csv`: **<LINK>**.  See `data/DATASET.md`.
 
-## 4. Training (every model, one seed)
-```bash
-python -m src.train --config configs/baseline.yaml    --seed 0 --out experiments/main/baseline/seed0
-python -m src.train --config configs/gru.yaml         --seed 0 --out experiments/main/gru/seed0
-python -m src.train --config configs/transformer.yaml --seed 0 --out experiments/main/transformer/seed0
-python -m src.train --config configs/stgcn.yaml       --seed 0 --out experiments/main/stgcn/seed0
-```
-### Full experimental pipeline (what produced the report)
-```bash
-for m in baseline gru transformer stgcn; do python -m src.tune --model $m --trials 6; done   # hyper-parameter study
-python -m src.run_all --study main --seeds 0 1 2             # final comparison (uses configs/best_*.yaml)
-python -m src.run_all --study aug repr ablation --seeds 0 1 2
-python -m src.pretrain --config configs/best_transformer.yaml # self-supervised pre-training (train split only)
-python -m src.run_all --study pretrain --seeds 0 1 2
-python -m src.error_analysis --model stgcn --seed 0           # failure analysis
-python -m src.aggregate                                       # tables 4,5,7 + hypotheses + figures
-```
-## 5. Evaluation
-`python -m src.evaluate --run experiments/main/stgcn/seed0` (the same `src/evaluate.py` is used by all models).
-## 6. Demo
-`python demo/app.py --run experiments/main/stgcn/seed0 experiments/main/transformer/seed0`
-## 7. Hardware and expected runtimes
-Keypoint extraction ≈ 20–40 min (CPU, 4 workers) · each deep-model run ≈ 2–6 min on a T4 GPU · full pipeline ≈ 3–4 h.
-*Fill in the real hardware and times from `experiments/tables/table7_computational_cost.md`.*
-## 8. Credits
-ASL Citizen dataset (Desai et al., NeurIPS 2023 D&B) · MediaPipe Holistic (Google) · ST-GCN idea (Yan et al., AAAI 2018) · TensorFlow/Keras ·
-Transformer (Vaswani et al., 2017). **Written by us:** multi-head self-attention (`src/models/transformer.py`),
-graph convolution (`src/models/stgcn.py`), all training/evaluation code. No external AI APIs are used for predictions.
-## Repository layout
-`configs/` one config per model (+ `best_*.yaml` from tuning) · `data/` subset + extraction scripts · `src/datasets/` loaders, normalisation,
-augmentation · `src/models/` one file per model family · `src/train.py`, `src/evaluate.py` shared · `experiments/` logs/tables/figures ·
-`demo/` Gradio app · `report/` report + slides · `contributions/` individual logs · `tests/` synthetic smoke test.
+---
+
+## 🚀 Training
+
+Training commands and model configurations will be documented here as the final experiment setup is confirmed.
+
+The project uses TensorFlow / Keras for deep learning model implementation.
+
+---
+
+## 📈 Evaluation
+
+Models are evaluated using classification metrics, including:
+
+- Top-1 Accuracy
+- Top-5 Accuracy
+- Macro F1-score
+- Confusion Matrix
+
+Final evaluation results will be added after completing the experiments.
+
+---
+
+## 🖥️ Demo
+
+A demonstration interface is included in the project repository.
+
+**Demo instructions:** Pending.
+
+---
+
+## 💻 Hardware and Computational Cost
+
+| Item | Details |
+|---|---|
+| Training Hardware | Pending |
+| GPU | Pending |
+| Training Time | Pending |
+| Inference Time | Pending |
+
+---
+
+## 📚 References and Acknowledgments
+
+This project builds upon the following resources and technologies:
+
+- **ASL Citizen** — American Sign Language video dataset.
+- **MediaPipe Holistic** — Pose and hand landmark extraction.
+- **TensorFlow / Keras** — Deep learning framework.
+- **Scikit-learn** — Machine learning utilities and evaluation.
+
+Custom model components and implementation details will be documented in the relevant source files.
+
+---
+
+## 📌 Project Status
+
+<sub>This README will be updated as implementation, experimentation, and evaluation progress.</sub>
+
+**Current Status:** In Progress

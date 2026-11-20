@@ -106,7 +106,13 @@ if __name__ == "__main__":
             index=False
         )
 
-    best = max(rows, key=lambda row: row["val_top1"])
+        best = max(
+    rows,
+    key=lambda row: (
+        row["val_macro_f1"],
+        row["val_top1"]
+    )
+)
 
     best_hp = {
         key: best[key]

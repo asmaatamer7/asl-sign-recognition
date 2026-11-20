@@ -3,4 +3,7 @@ videos_subset/
 *.zip
 __pycache__/
 .venv/
-checkpoints/*.pt
+# model files (keep them on Drive, link in README)
+experiments/**/model_weights.npz
+experiments/**/model.joblib
+checkpoints/*.npz

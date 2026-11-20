@@ -2,7 +2,7 @@
 Metrics: top-1, top-5, macro-F1, per-class precision/recall/F1, bootstrap 95% CI.
 CLI re-evaluates a finished run:  python -m src.evaluate --run experiments/main/stgcn/seed0"""
 import argparse, json
-import numpy as np, torch
+import numpy as np
 from sklearn.metrics import f1_score, precision_recall_fscore_support
 
 
@@ -24,16 +24,17 @@ def compute_metrics(y, probs, n_boot=500, seed=0):
             "per_class": {"precision": p.tolist(), "recall": r.tolist(), "f1": f.tolist()}, "n": int(len(y))}
 
 
-@torch.no_grad()
-def predict(model, loader, device):
-    model.eval(); P, Y = [], []
-    for x, y in loader:
-        P.append(model(x.to(device)).softmax(-1).cpu().numpy()); Y.append(y.numpy())
+def predict(model, ds, batch_size=128):
+    """Softmax probabilities for a SignDataset (no augmentation, original order)."""
+    import tensorflow as tf
+    P, Y = [], []
+    for x, y in ds.batches(batch_size):
+        P.append(tf.nn.softmax(model(x, training=False)).numpy()); Y.append(y)
     return np.concatenate(P), np.concatenate(Y)
 
 
 if __name__ == "__main__":
-    from src.train import load_run, evaluate_run
+    from src.train import evaluate_run
     ap = argparse.ArgumentParser(); ap.add_argument("--run", required=True); ap.add_argument("--split", default="test")
     a = ap.parse_args()
     m = evaluate_run(a.run, a.split)

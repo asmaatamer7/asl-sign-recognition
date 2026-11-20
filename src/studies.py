@@ -22,7 +22,7 @@ def _runs():
                  [("xy", {}), ("xyz", {"data.use_z": True}), ("xy_vel", {"data.use_vel": True})]]
     S["ablation"] = ([("transformer_no_attention", "transformer", {"model.attn": False})] +
                      [(f"{m}_{v}", m, {"data.joints": v}) for m in ["transformer", "stgcn"] for v in ["hands", "body"]])
-    S["pretrain"] = [("transformer_ssl", "transformer", {"train.init_from": "checkpoints/transformer_ssl.pt"})]
+    S["pretrain"] = [("transformer_ssl", "transformer", {"train.init_from": "checkpoints/transformer_ssl.npz"})]
     return S
 
 

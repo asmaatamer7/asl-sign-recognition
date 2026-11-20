@@ -3,8 +3,7 @@
 Raw keypoints (T, 75, 3) -> keep 49 joints (7 upper-body pose + 21 left hand + 21 right hand)
 -> normalise by shoulder centre / shoulder width -> (optional) augment -> (T, 49, C) features.
 """
-import numpy as np, pandas as pd, torch
-from torch.utils.data import Dataset
+import numpy as np, pandas as pd
 
 POSE_KEEP = [0, 11, 12, 13, 14, 15, 16]          # nose, shoulders, elbows, wrists
 RAW_IDX = POSE_KEEP + list(range(33, 54)) + list(range(54, 75))
@@ -31,7 +30,7 @@ def preprocess(raw):
     return kp.astype(np.float32), present
 
 
-def augment(pre, present, aug, rng):
+def augment_fn(pre, present, aug, rng):
     """Train-time augmentation. aug: dict(rotate deg, scale, shift, noise, tcrop). 0/None = off."""
     pre, present = pre.copy(), present.copy()
     T = pre.shape[0]
@@ -78,9 +77,9 @@ def n_channels(dcfg):
 
 
 def sequence_to_tensor(raw, dcfg):
-    """Used by the demo: raw keypoints (T,75,3) -> (1,T,J,C) tensor."""
+    """Used by the demo: raw keypoints (T,75,3) -> (1,T,J,C) float32 array."""
     pre, present = preprocess(raw)
-    return torch.from_numpy(build_features(pre, present, dcfg))[None]
+    return build_features(pre, present, dcfg)[None]
 
 
 def make_label_map(csv):
@@ -88,7 +87,9 @@ def make_label_map(csv):
     return {g: i for i, g in enumerate(sorted(df[df.split == "train"].gloss.unique()))}
 
 
-class SignDataset(Dataset):
+class SignDataset:
+    """In-memory dataset (framework independent: numpy only). Models consume (B,T,J,C) float32 arrays."""
+
     def __init__(self, csv, split, dcfg, train=False, label_map=None, seed=0, limit=None):
         df = pd.read_csv(csv)
         df = df[df.split == split].reset_index(drop=True)
@@ -105,11 +106,22 @@ class SignDataset(Dataset):
     def __len__(self):
         return len(self.y)
 
-    def __getitem__(self, i):
-        pre, pr = self.pre[i], self.present[i]
-        if self.train and self.dcfg.get("aug"):
-            pre, pr = augment(pre, pr, self.dcfg["aug"], self.rng)
-        return torch.from_numpy(build_features(pre, pr, self.dcfg)), int(self.y[i])
+    def arrays(self, augment=False):
+        """All samples as one array (N,T,J,C); with augment=True a fresh random augmentation is drawn."""
+        X = []
+        for pre, pr in zip(self.pre, self.present):
+            if augment and self.dcfg.get("aug"):
+                pre, pr = augment_fn(pre, pr, self.dcfg["aug"], self.rng)
+            X.append(build_features(pre, pr, self.dcfg))
+        return np.stack(X), self.y
+
+    def batches(self, batch_size, shuffle=False, drop_last=False, augment=False):
+        X, y = self.arrays(augment)
+        idx = self.rng.permutation(len(y)) if shuffle else np.arange(len(y))
+        end = (len(y) // batch_size) * batch_size if drop_last else len(y)
+        for s in range(0, end, batch_size):
+            j = idx[s:s + batch_size]
+            yield X[j], y[j]
 
     def tabular(self):
         """Hand-crafted features for the classical baseline: mean/std/min/max over time and the

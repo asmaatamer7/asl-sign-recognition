@@ -1,4 +1,4 @@
-torch>=2.1
+tensorflow>=2.16     # TensorFlow / Keras (on Colab it is preinstalled: do NOT reinstall it)
 numpy
 pandas
 scipy

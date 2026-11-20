@@ -1,17 +1,20 @@
-import torch, torch.nn as nn
+import tensorflow as tf
+from tensorflow.keras import layers
 
 
-class RNNClassifier(nn.Module):
-    """Classic recurrent model: frame embedding -> (Bi)GRU/LSTM -> temporal mean pooling -> linear."""
-
-    def __init__(self, J, C, num_classes, hidden=128, layers=2, dropout=0.3, cell="gru", bidirectional=True):
-        super().__init__()
-        self.proj = nn.Sequential(nn.Linear(J * C, hidden), nn.LayerNorm(hidden), nn.GELU(), nn.Dropout(dropout))
-        rnn = nn.GRU if cell == "gru" else nn.LSTM
-        self.rnn = rnn(hidden, hidden, layers, batch_first=True, bidirectional=bidirectional,
-                       dropout=dropout if layers > 1 else 0.0)
-        self.head = nn.Sequential(nn.Dropout(dropout), nn.Linear(hidden * (2 if bidirectional else 1), num_classes))
-
-    def forward(self, x):                      # x (B,T,J,C)
-        h, _ = self.rnn(self.proj(x.flatten(2)))
-        return self.head(h.mean(1))
+def RNNClassifier(J, C, num_classes, T=64, hidden=128, layers_n=2, dropout=0.3, cell="gru", bidirectional=True, **kw):
+    """Classic recurrent model: frame embedding -> (Bi)GRU/LSTM stack -> temporal mean pooling -> linear."""
+    layers_n = kw.pop("layers", layers_n)
+    inp = layers.Input((T, J, C))
+    x = layers.Reshape((T, J * C))(inp)
+    x = layers.Dense(hidden)(x); x = layers.LayerNormalization()(x)
+    x = layers.Activation(tf.nn.gelu)(x); x = layers.Dropout(dropout)(x)
+    Rnn = layers.GRU if cell == "gru" else layers.LSTM
+    for i in range(layers_n):
+        r = Rnn(hidden, return_sequences=True)
+        x = layers.Bidirectional(r)(x) if bidirectional else r(x)
+        if i < layers_n - 1:
+            x = layers.Dropout(dropout)(x)
+    x = layers.GlobalAveragePooling1D()(x)
+    x = layers.Dropout(dropout)(x)
+    return tf.keras.Model(inp, layers.Dense(num_classes)(x), name="rnn")

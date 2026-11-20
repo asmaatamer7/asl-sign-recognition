@@ -1,38 +1,55 @@
-"""Single entry point to train + evaluate one configuration with one seed.
+"""Single entry point to train + evaluate one configuration with one seed (TensorFlow / Keras).
   python -m src.train --config configs/transformer.yaml --seed 0 --out experiments/main/transformer/seed0
-The TEST split is touched exactly once, at the end, with the checkpoint that was best on validation."""
-import argparse, copy, json, os, platform, time
+The TEST split is touched exactly once, at the end, with the weights that were best on validation."""
+import argparse, json, os, platform, time
 from pathlib import Path
-import joblib, numpy as np, torch, torch.nn as nn
-from torch.utils.data import DataLoader
-from src.utils import load_cfg, parse_set, set_seed, count_params
-from src.datasets.dataset import SignDataset, make_label_map, n_channels, J
+import joblib, numpy as np, tensorflow as tf
+from src.utils import load_cfg, parse_set, set_seed, save_weights, load_weights
+from src.datasets.dataset import SignDataset, make_label_map, n_channels
 from src.models import build_model
 from src.evaluate import compute_metrics, predict
 
 
 def hardware():
-    if torch.cuda.is_available():
-        return f"{torch.cuda.get_device_name(0)} (CUDA) + {platform.processor() or platform.machine()}"
-    return f"CPU {platform.processor() or platform.machine()}"
+    gpus = tf.config.list_physical_devices("GPU")
+    cpu = platform.processor() or platform.machine()
+    if gpus:
+        try: name = tf.config.experimental.get_device_details(gpus[0]).get("device_name", "GPU")
+        except Exception: name = "GPU"
+        return f"{name} (CUDA) + {cpu} | TF {tf.__version__}"
+    return f"CPU {cpu} | TF {tf.__version__}"
 
 
-@torch.no_grad()
-def time_inference(model, x, reps=50):
-    """ms per single sample (batch=1) on CPU, and on GPU if available."""
-    out = {}
-    m = copy.deepcopy(model).cpu().eval(); xs = x[:1].cpu()
-    for _ in range(5): m(xs)
-    t = time.perf_counter()
-    for _ in range(reps): m(xs)
-    out["infer_ms_cpu"] = (time.perf_counter() - t) / reps * 1000
-    if torch.cuda.is_available():
-        m = m.cuda(); xs = xs.cuda()
-        for _ in range(10): m(xs)
-        torch.cuda.synchronize(); t = time.perf_counter()
-        for _ in range(reps): m(xs)
-        torch.cuda.synchronize(); out["infer_ms_gpu"] = (time.perf_counter() - t) / reps * 1000
+def time_inference(model, x1, reps=50):
+    """ms per single sample (batch=1): CPU, and GPU if one is available."""
+    f = tf.function(lambda a: model(a, training=False))
+    out, x1 = {}, tf.constant(x1[:1])
+    with tf.device("/CPU:0"):
+        for _ in range(5): f(x1).numpy()
+        t = time.perf_counter()
+        for _ in range(reps): f(x1).numpy()
+        out["infer_ms_cpu"] = (time.perf_counter() - t) / reps * 1000
+    if tf.config.list_physical_devices("GPU"):
+        g = tf.function(lambda a: model(a, training=False))
+        with tf.device("/GPU:0"):
+            for _ in range(10): g(x1).numpy()
+            t = time.perf_counter()
+            for _ in range(reps): g(x1).numpy()
+            out["infer_ms_gpu"] = (time.perf_counter() - t) / reps * 1000
     return out
+
+
+class WarmupCosine(tf.keras.optimizers.schedules.LearningRateSchedule):
+    def __init__(self, lr, warm, total):
+        super().__init__(); self.lr, self.warm, self.total = float(lr), float(max(warm, 1)), float(max(total, 1))
+
+    def __call__(self, step):
+        s = tf.cast(step, tf.float32)
+        prog = tf.clip_by_value((s - self.warm) / max(1.0, self.total - self.warm), 0.0, 1.0)
+        return self.lr * tf.where(s < self.warm, (s + 1) / self.warm, 0.5 * (1 + tf.cos(np.pi * prog)))
+
+    def get_config(self):
+        return {"lr": self.lr, "warm": self.warm, "total": self.total}
 
 
 def run_baseline(cfg, seed, out, dtr, dva, dte, eval_test):
@@ -49,62 +66,71 @@ def run_baseline(cfg, seed, out, dtr, dva, dte, eval_test):
         p = np.zeros((len(X), K)); p[:, clf.classes_] = clf.predict_proba(X); return p
     res = {"val": compute_metrics(dva.y, probs(Xva), n_boot=50)}
     joblib.dump({"clf": clf, "cfg": cfg, "classes": list(dtr.label_map)}, out / "model.joblib")
-    n_par = int(sum(np.size(s.coef_) + np.size(s.intercept_) for s in [clf[-1]]))
+    n_par = int(np.size(clf[-1].coef_) + np.size(clf[-1].intercept_))
     t = time.perf_counter()
     for _ in range(50): clf.predict_proba(Xva[:1])
     cost = {"params": n_par, "size_mb": os.path.getsize(out / "model.joblib") / 1e6, "train_time_s": train_time,
             "infer_ms_cpu": (time.perf_counter() - t) / 50 * 1000, "hardware": hardware(), "epochs_run": 0}
     if eval_test:
-        Xte = dte.tabular(); pt = probs(Xte)
+        pt = probs(dte.tabular())
         res["test"] = compute_metrics(dte.y, pt); np.savez(out / "test_preds.npz", probs=pt, y=dte.y)
     return res, cost
 
 
-def run_torch(cfg, seed, out, dtr, dva, dte, eval_test):
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+def run_tf(cfg, seed, out, dtr, dva, dte, eval_test):
     tc = cfg["train"]; K = len(dtr.label_map); C = n_channels(cfg["data"])
-    model = build_model(cfg, K, C).to(device)
+    model = build_model(cfg, K, C)
     if tc.get("init_from"):
-        sd = torch.load(tc["init_from"], map_location=device)
-        missing = model.load_state_dict(sd, strict=False)
-        print("loaded pretrained encoder; missing keys:", len(missing.missing_keys))
-    g = torch.Generator().manual_seed(seed)
-    ltr = DataLoader(dtr, tc["batch_size"], shuffle=True, drop_last=True, generator=g)
-    lva = DataLoader(dva, 128); lte = DataLoader(dte, 128)
-    opt = torch.optim.AdamW(model.parameters(), lr=tc["lr"], weight_decay=tc["weight_decay"])
-    steps = tc["epochs"] * len(ltr); warm = tc["warmup_epochs"] * len(ltr)
-    sched = torch.optim.lr_scheduler.LambdaLR(opt, lambda s: (s + 1) / warm if s < warm else
-                                              0.5 * (1 + np.cos(np.pi * (s - warm) / max(1, steps - warm))))
-    crit = nn.CrossEntropyLoss(label_smoothing=tc["label_smoothing"])
-    best, best_state, bad, hist = -1, None, 0, []
-    if device == "cuda": torch.cuda.reset_peak_memory_stats()
+        load_weights(model, tc["init_from"]); print("loaded SSL-pretrained weights (classifier head is re-initialised)")
+        for v in model.head.trainable_variables: v.assign(tf.random.normal(v.shape, stddev=0.02))
+    steps_per_epoch = len(dtr) // tc["batch_size"]
+    sched = WarmupCosine(tc["lr"], tc["warmup_epochs"] * steps_per_epoch, tc["epochs"] * steps_per_epoch)
+    opt = tf.keras.optimizers.AdamW(learning_rate=sched, weight_decay=tc["weight_decay"])
+    loss_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=True, label_smoothing=tc["label_smoothing"])
+
+    @tf.function
+    def train_step(x, y):
+        with tf.GradientTape() as tape:
+            loss = loss_fn(tf.one_hot(y, K), model(x, training=True))
+        vs = model.trainable_variables
+        grads = tape.gradient(loss, vs)
+        gv = [(g, v) for g, v in zip(grads, vs) if g is not None]
+        clipped, _ = tf.clip_by_global_norm([g for g, _ in gv], 1.0)
+        opt.apply_gradients(zip(clipped, [v for _, v in gv]))
+        return loss
+
+    best, best_w, bad, hist = -1.0, None, 0, []
+    gpu = bool(tf.config.list_physical_devices("GPU"))
+    if gpu:
+        try: tf.config.experimental.reset_memory_stats("GPU:0")
+        except Exception: pass
     t0 = time.time()
     for ep in range(tc["epochs"]):
-        model.train(); tl = 0
-        for x, y in ltr:
-            x, y = x.to(device), y.to(device)
-            loss = crit(model(x), y)
-            opt.zero_grad(); loss.backward(); nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            opt.step(); sched.step(); tl += loss.item()
-        pv, yv = predict(model, lva, device); va = float((pv.argmax(1) == yv).mean())
-        hist.append({"epoch": ep, "train_loss": tl / len(ltr), "val_top1": va})
+        tl, n = 0.0, 0
+        for x, y in dtr.batches(tc["batch_size"], shuffle=True, drop_last=True, augment=True):
+            tl += float(train_step(tf.constant(x), tf.constant(y))); n += 1
+        pv, yv = predict(model, dva); va = float((pv.argmax(1) == yv).mean())
+        hist.append({"epoch": ep, "train_loss": tl / max(n, 1), "val_top1": va})
         if va > best:
-            best, bad = va, 0; best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+            best, bad, best_w = va, 0, model.get_weights()
         else:
             bad += 1
             if bad >= tc["patience"]: break
     train_time = time.time() - t0
-    model.load_state_dict(best_state)
-    torch.save({"cfg": cfg, "state": best_state, "classes": list(dtr.label_map), "in_channels": C}, out / "model.pt")
+    model.set_weights(best_w)
+    save_weights(model, out / "model_weights.npz", cfg, list(dtr.label_map), C)
     import pandas as pd; pd.DataFrame(hist).to_csv(out / "history.csv", index=False)
-    pv, yv = predict(model, lva, device)
+    pv, yv = predict(model, dva)
     res = {"val": compute_metrics(yv, pv, n_boot=50)}
-    cost = {"params": count_params(model), "size_mb": os.path.getsize(out / "model.pt") / 1e6,
-            "train_time_s": train_time, "epochs_run": len(hist), "hardware": hardware(),
-            "peak_gpu_mem_mb": torch.cuda.max_memory_allocated() / 1e6 if device == "cuda" else None}
-    cost.update(time_inference(model, dva[0][0][None]))
+    peak = None
+    if gpu:
+        try: peak = tf.config.experimental.get_memory_info("GPU:0")["peak"] / 1e6
+        except Exception: pass
+    cost = {"params": int(model.count_params()), "size_mb": os.path.getsize(out / "model_weights.npz") / 1e6,
+            "train_time_s": train_time, "epochs_run": len(hist), "hardware": hardware(), "peak_gpu_mem_mb": peak}
+    cost.update(time_inference(model, dva.arrays()[0][:1]))
     if eval_test:
-        pt, yt = predict(model, lte, device)
+        pt, yt = predict(model, dte)
         res["test"] = compute_metrics(yt, pt); np.savez(out / "test_preds.npz", probs=pt, y=yt)
     return res, cost
 
@@ -116,7 +142,7 @@ def run(cfg, seed, out, eval_test=True):
     dtr = SignDataset(csv, "train", cfg["data"], True, lm, seed)
     dva = SignDataset(csv, "val", cfg["data"], False, lm)
     dte = SignDataset(csv, "test", cfg["data"], False, lm) if eval_test else None
-    fn = run_baseline if cfg["model"]["name"] == "baseline" else run_torch
+    fn = run_baseline if cfg["model"]["name"] == "baseline" else run_tf
     res, cost = fn(cfg, seed, out, dtr, dva, dte, eval_test)
     res.update(cost=cost, seed=seed, cfg=cfg)
     json.dump(res, open(out / "metrics.json", "w"), indent=1)
@@ -127,13 +153,15 @@ def run(cfg, seed, out, eval_test=True):
 
 
 def load_run(run_dir):
+    """Rebuild a finished run: returns dict(cfg, classes, model) or the sklearn bundle for the baseline."""
     run_dir = Path(run_dir)
     if (run_dir / "model.joblib").exists():
         return joblib.load(run_dir / "model.joblib")
-    ck = torch.load(run_dir / "model.pt", map_location="cpu")
-    model = build_model(ck["cfg"], len(ck["classes"]), ck["in_channels"]); model.load_state_dict(ck["state"])
-    ck["model"] = model.eval()
-    return ck
+    z = np.load(run_dir / "model_weights.npz", allow_pickle=False)
+    cfg, classes = json.loads(str(z["cfg"])), json.loads(str(z["classes"]))
+    model = build_model(cfg, len(classes), int(z["in_channels"]))
+    load_weights(model, run_dir / "model_weights.npz")
+    return {"cfg": cfg, "classes": classes, "model": model}
 
 
 def evaluate_run(run_dir, split="test"):
@@ -143,7 +171,7 @@ def evaluate_run(run_dir, split="test"):
     if "clf" in ck:
         p = ck["clf"].predict_proba(ds.tabular()); full = np.zeros((len(ds), len(lm))); full[:, ck["clf"].classes_] = p
         return compute_metrics(ds.y, full)
-    p, y = predict(ck["model"], DataLoader(ds, 128), "cpu")
+    p, y = predict(ck["model"], ds)
     return compute_metrics(y, p)
 
 

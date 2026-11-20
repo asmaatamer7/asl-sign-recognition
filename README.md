@@ -6,7 +6,7 @@
 
 ## 1. Task and best result
 Classify a short video of one ASL sign into one of **100 signs** (random subset of ASL Citizen, official
-signer-independent split). Videos → MediaPipe Holistic keypoints (7 body + 2×21 hand joints) → sequence models.
+signer-independent split). Videos → MediaPipe Holistic keypoints (7 body + 2×21 hand joints) → sequence models. **Framework: TensorFlow / Keras.**
 Best result: **<MODEL> — top-1 XX.X ± X.X %, top-5 XX.X %, macro-F1 XX.X %** (mean ± SD, 3 seeds, test set). *(fill in)*
 
 ## 2. Environment
@@ -47,7 +47,7 @@ python -m src.aggregate                                       # tables 4,5,7 + h
 Keypoint extraction ≈ 20–40 min (CPU, 4 workers) · each deep-model run ≈ 2–6 min on a T4 GPU · full pipeline ≈ 3–4 h.
 *Fill in the real hardware and times from `experiments/tables/table7_computational_cost.md`.*
 ## 8. Credits
-ASL Citizen dataset (Desai et al., NeurIPS 2023 D&B) · MediaPipe Holistic (Google) · ST-GCN idea (Yan et al., AAAI 2018) ·
+ASL Citizen dataset (Desai et al., NeurIPS 2023 D&B) · MediaPipe Holistic (Google) · ST-GCN idea (Yan et al., AAAI 2018) · TensorFlow/Keras ·
 Transformer (Vaswani et al., 2017). **Written by us:** multi-head self-attention (`src/models/transformer.py`),
 graph convolution (`src/models/stgcn.py`), all training/evaluation code. No external AI APIs are used for predictions.
 ## Repository layout

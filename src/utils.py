@@ -34,10 +34,21 @@ def parse_set(items):
 
 
 def set_seed(seed):
-    import torch
-    random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
+    random.seed(seed); np.random.seed(seed)
+    import tensorflow as tf
+    tf.keras.utils.set_random_seed(seed)          # python + numpy + TensorFlow
 
 
-def count_params(model):
-    return sum(p.numel() for p in model.parameters())
+def save_weights(model, path, cfg=None, classes=None, in_channels=None):
+    """Framework-version-proof checkpoint: plain numpy arrays (+ config) in one .npz file."""
+    import json
+    extra = {}
+    if cfg is not None:
+        extra = {"cfg": json.dumps(cfg), "classes": json.dumps(classes), "in_channels": in_channels}
+    np.savez(path, **{f"w{i}": w for i, w in enumerate(model.get_weights())}, **extra)
+
+
+def load_weights(model, path):
+    z = np.load(path, allow_pickle=False)
+    ws = [z[f"w{i}"] for i in range(sum(k.startswith("w") and k[1:].isdigit() for k in z.files))]
+    model.set_weights(ws)

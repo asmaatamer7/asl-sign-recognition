@@ -3,7 +3,7 @@
 Several models can be loaded:  --run experiments/main/stgcn/seed0 experiments/main/transformer/seed0"""
 import argparse, sys, time
 from pathlib import Path
-import numpy as np, torch, gradio as gr
+import numpy as np, tensorflow as tf, gradio as gr
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.train import load_run
 from src.datasets.dataset import sequence_to_tensor
@@ -15,7 +15,7 @@ a = ap.parse_args()
 MODELS = {}
 for r in a.run:
     ck = load_run(r)
-    if "model" in ck: MODELS[Path(r).parent.name] = ck           # torch models only (baseline skipped)
+    if "model" in ck: MODELS[Path(r).parent.name] = ck           # neural models only (baseline skipped)
 HOL = make_holistic()
 
 
@@ -29,8 +29,7 @@ def predict(video, model_name):
     hands = (np.abs(raw[:, 33:75]).sum((1, 2)) > 0).mean()
     ck = MODELS[model_name]
     x = sequence_to_tensor(raw, ck["cfg"]["data"])
-    with torch.no_grad():
-        p = ck["model"](x).softmax(-1)[0].numpy()
+    p = tf.nn.softmax(ck["model"](x, training=False))[0].numpy()
     top = np.argsort(-p)[:5]
     msg = f"Hands detected in {hands * 100:.0f}% of frames · total {1000 * (time.time() - t0):.0f} ms"
     if hands < 0.5: msg += " ⚠️ hands poorly tracked: keep both hands visible, good light, plain background"

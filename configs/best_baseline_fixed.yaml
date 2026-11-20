@@ -1,0 +1,23 @@
+data:
+  csv: /content/drive/MyDrive/asl/subset_kp_fixed.csv
+  joints: all
+  use_z: false
+  use_vel: false
+  aug:
+    rotate: 15
+    scale: 0.15
+    shift: 0.1
+    noise: 0.01
+    tcrop: 0.7
+train:
+  epochs: 60
+  batch_size: 64
+  lr: 0.001
+  weight_decay: 0.01
+  label_smoothing: 0.1
+  warmup_epochs: 3
+  patience: 12
+  init_from: null
+model:
+  name: baseline
+  C: 1.0

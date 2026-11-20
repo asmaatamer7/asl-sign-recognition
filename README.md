@@ -1,6 +1,5 @@
-
 # 🤟 Isolated Sign Language Recognition
-### Pose-Based Deep Learning on ASL Citizen
+### Pose-Based Machine Learning and Deep Learning on ASL Citizen
 
 **Deep Learning — AI403 | Pharos University in Alexandria**  
 **Academic Year: 2026–2027 | Fall 2026**
@@ -22,9 +21,11 @@
 
 This project focuses on **Isolated American Sign Language (ASL) Recognition**.
 
-The goal is to classify short sign-language video sequences into their corresponding signs using deep learning models.
+The goal is to classify short sign-language video sequences into their corresponding signs using machine learning and deep learning models.
 
-Instead of processing raw video frames directly, the project uses pose-based representations extracted with **MediaPipe Holistic**. These representations are then processed by sequence-learning models implemented using **TensorFlow / Keras**.
+Instead of processing raw video frames directly, the project uses pose-based representations extracted using **MediaPipe Holistic**. The extracted keypoints are processed to create structured temporal features that can be used by different classification architectures.
+
+The project explores a classical machine learning baseline and multiple deep learning approaches for sequence classification.
 
 ### Project Information
 
@@ -36,23 +37,68 @@ Instead of processing raw video frames directly, the project uses pose-based rep
 | Dataset | ASL Citizen |
 | Task | Multi-class classification |
 | Number of Classes | 100 signs |
-| Input Representation | Pose sequences |
+| Input Representation | Pose and hand keypoint sequences |
 | Feature Extraction | MediaPipe Holistic |
-| Deep Learning Framework | TensorFlow / Keras |
+| Classical ML | Logistic Regression |
+| Deep Learning Framework | TensorFlow / Keras and other model-specific implementations |
 
 ---
 
-## 🏆 Model Performance
+## 🧠 Models
 
-Final model comparison and performance results will be added after completing all experiments and evaluating the models using three random seeds.
+The project investigates the following models:
+
+| Model | Description | Status |
+|---|---|---|
+| Baseline | Logistic Regression using handcrafted temporal features | Completed |
+| GRU | Gated Recurrent Unit for sequential feature learning | Experiment completed / results pending final verification |
+| Transformer | Attention-based sequence classification | Pending final results |
+| ST-GCN | Spatial-Temporal Graph Convolutional Network | Pending final results |
+
+Final model comparisons will be updated after all experiments have been verified.
+
+---
+
+## 📊 Baseline Experimental Results
+
+The baseline uses **Logistic Regression** with handcrafted temporal features extracted from pose sequences.
+
+### Hyperparameter Tuning
+
+The regularization parameter `C` was selected using validation performance.
+
+| Parameter | Value |
+|---|---|
+| Model | Logistic Regression |
+| Hyperparameter | C |
+| Search Values | 0.001, 0.01, 0.1, 1.0, 10.0, 100.0 |
+| Number of Trials | 6 |
+| Selection Metric | Validation Top-1 Accuracy |
+| Best C | 1.0 |
+
+### Final Evaluation
+
+The selected configuration was evaluated using three seeds: 0, 1, and 2.
+
+| Metric | Mean | Standard Deviation |
+|---|---:|---:|
+| Validation Top-1 Accuracy | 71.35% | 0.00% |
+| Validation Top-5 Accuracy | 89.06% | 0.00% |
+| Validation Macro F1-score | 71.37% | 0.00% |
+| Test Top-1 Accuracy | 56.79% | 0.00% |
+| Test Top-5 Accuracy | 80.16% | 0.00% |
+| Test Macro F1-score | 56.99% | 0.00% |
+
+**Note:** The baseline produces identical predictions across the three seeds because its handcrafted feature extraction and Logistic Regression training procedure are deterministic under the selected solver configuration.
+
+### Computational Cost
 
 | Metric | Result |
-|---|---|
-| Best Model | Pending |
-| Test Top-1 Accuracy | Pending |
-| Test Top-5 Accuracy | Pending |
-| Test Macro F1-score | Pending |
-| Number of Seeds | 3 |
+|---|---:|
+| Model Parameters / Features | 68,700 |
+| Model Size | 0.57 MB |
+| Training Time | Approximately 10–14 seconds |
+| Hardware | CPU (x86_64) |
 
 ---
 
@@ -69,11 +115,13 @@ asl-sign-recognition/
 │
 ├── demo/
 │
-├── results/
+├── experiments/
+│   ├── tuning/
 │   └── main/
 │       └── baseline/
-│           └── seed0/
-│               └── metrics.json
+│           ├── seed0/
+│           ├── seed1/
+│           └── seed2/
 │
 ├── src/
 │
@@ -82,7 +130,9 @@ asl-sign-recognition/
 └── .gitignore
 ```
 
-*Additional model results and files will be added as experiments are completed.*
+Additional configuration files, model implementations, and experiment outputs may be added as the project develops.
+
+Large model artifacts and datasets are managed separately and are not necessarily included in the GitHub repository.
 
 ---
 
@@ -148,24 +198,28 @@ pip install -r requirements.txt
 
 ---
 
-## 🚀 Training
+## 🚀 Training and Experiments
 
-Training commands and model configurations will be documented here as the final experiment setup is confirmed.
+The project includes separate implementations and configurations for the evaluated models.
 
-The project uses TensorFlow / Keras for deep learning model implementation.
+Each model is trained and evaluated using the project's experimental setup.
+
+Hyperparameter tuning is performed using validation performance. The test set is reserved for final evaluation.
+
+Refer to the source code and configuration files for model-specific execution commands.
 
 ---
 
 ## 📈 Evaluation
 
-Models are evaluated using classification metrics, including:
+Models are evaluated using the following metrics:
 
 - Top-1 Accuracy
 - Top-5 Accuracy
 - Macro F1-score
 - Confusion Matrix
 
-Final evaluation results will be added after completing the experiments.
+Final model comparisons will use the same evaluation metrics and experimental protocol wherever applicable.
 
 ---
 
@@ -173,18 +227,20 @@ Final evaluation results will be added after completing the experiments.
 
 A demonstration interface is included in the project repository.
 
-**Demo instructions:** Pending.
+**Demo instructions:** To be documented.
 
 ---
 
 ## 💻 Hardware and Computational Cost
 
+Hardware and computational cost are reported for individual models based on their experimental runs.
+
 | Item | Details |
 |---|---|
-| Training Hardware | Pending |
-| GPU | Pending |
-| Training Time | Pending |
-| Inference Time | Pending |
+| Baseline Training Hardware | CPU (x86_64) |
+| Baseline Model Size | 0.57 MB |
+| Baseline Training Time | Approximately 10–14 seconds |
+| Other Models | To be reported after final evaluation |
 
 ---
 
@@ -195,14 +251,14 @@ This project builds upon the following resources and technologies:
 - **ASL Citizen** — American Sign Language video dataset.
 - **MediaPipe Holistic** — Pose and hand landmark extraction.
 - **TensorFlow / Keras** — Deep learning framework.
-- **Scikit-learn** — Machine learning utilities and evaluation.
+- **Scikit-learn** — Classical machine learning and evaluation utilities.
 
-Custom model components and implementation details will be documented in the relevant source files.
+Custom model components and implementation details are documented in the relevant source files.
 
 ---
 
 ## 📌 Project Status
 
-<sub>This README will be updated as implementation, experimentation, and evaluation progress.</sub>
+**Current Status:** Experiments completed or under final verification; final cross-model comparison and documentation are in progress.
 
-**Current Status:** In Progress
+The README will be updated with the verified results of all models before final submission.

@@ -1,1 +1,1 @@
-Add GRU resuts
+Add GRU results

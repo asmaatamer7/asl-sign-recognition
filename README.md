@@ -116,3 +116,16 @@ The planned experiments include:
 
 These experiments were not completed within the project timeline.
 Therefore, no ablation results are reported.
+## Final Model Results
+
+All four model families were evaluated using three random seeds.
+
+| Model | Top-1 Accuracy | Top-5 Accuracy | Macro-F1 |
+|---|---:|---:|---:|
+| Transformer | 80.0% ± 1.3 | 92.4% ± 0.3 | 79.7% ± 1.4 |
+| GRU | 76.6% ± 0.8 | 92.5% ± 0.2 | 76.5% ± 0.9 |
+| Baseline | 56.8% ± 0.0 | 80.2% ± 0.0 | 57.0% ± 0.0 |
+| ST-GCN | 52.0% ± 1.3 | 80.4% ± 0.3 | 50.9% ± 1.2 |
+
+The Transformer achieved the highest Top-1 accuracy and Macro-F1,
+while GRU achieved the highest Top-5 accuracy.
